@@ -1,6 +1,7 @@
-import ipadic
+
 import io
 import MeCab
+import ipadic
 import pandas as pd
 import streamlit as st
 from collections import Counter
@@ -39,7 +40,8 @@ if uploaded_file is not None:
             with st.spinner("Generating..."):
                 io_string = io.StringIO(uploaded_file.getvalue().decode("shift-jis"))
                 text = io_string.read()
-                tagger = MeCab.Tagger()
+                #tagger = MeCab.Tagger()
+                tagger = MeCab.Tagger(ipadic.MECAB_ARGS)
                 node = tagger.parseToNode(text)
                 words = []
                 while node:
@@ -70,7 +72,8 @@ if uploaded_file is not None:
             with st.spinner("Generating..."):
                 io_string = io.StringIO(uploaded_file.getvalue().decode("shift-jis"))
                 text = io_string.read()
-                tagger = MeCab.Tagger()
+                #tagger = MeCab.Tagger()
+                tagger = MeCab.Tagger(ipadic.MECAB_ARGS)
                 node = tagger.parseToNode(text)
 
                 # 品詞ごとに出現単語と出現回数をカウント

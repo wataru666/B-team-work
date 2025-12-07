@@ -1,0 +1,5 @@
+streamlit
+mecab-python3
+wordcloud
+pandas
+ipadic

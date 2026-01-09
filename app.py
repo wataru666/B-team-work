@@ -1,109 +1,55 @@
-
-import io
-import MeCab
-import ipadic
-import pandas as pd
 import streamlit as st
-from collections import Counter
-from wordcloud import WordCloud
+import pandas as pd
 
-# ページのレイアウトを設定
-st.set_page_config(
-    page_title="テキスト可視化",
-    layout="wide", # wideにすると横長なレイアウトに
-    initial_sidebar_state="expanded"
-)
+# セッションステートでデータを管理
+if 'grade_data' not in st.session_state:
+    st.session_state.grade_data = pd.DataFrame(columns=['科目', '成績'])
 
-# タイトルの設定
-st.title("テキスト可視化")
+if 'teaching_style' not in st.session_state:
+    st.session_state.teaching_style = pd.DataFrame(columns=['科目', '授業スタイル'])
 
-# サイドバーにアップロードファイルのウィジェットを表示
-st.sidebar.markdown("# ファイルアップロード")
-uploaded_file = st.sidebar.file_uploader(
-    "テキストファイルをアップロードしてください", type="txt"
-)
+st.title("授業効率化システム")
 
-# ワードクラウド、出現頻度表の各処理をサイドバーに表示
-st.sidebar.markdown("# 可視化のオプション")
-if uploaded_file is not None:
-    # 処理の選択
-    option = st.sidebar.selectbox(
-        "処理の種類を選択してください", ["ワードクラウド", "出現頻度表"]
-    )
-    # ワードクラウドの表示
-    if option == "ワードクラウド":
-        pos_options = ["名詞", "形容詞", "動詞", "副詞", "助詞", "助動詞", "接続詞", "感動詞", "連体詞", "記号", "未知語"]
-        # マルチセレクトボックス
-        selected_pos = st.sidebar.multiselect("品詞選択", pos_options, default=["名詞"])
-        if st.sidebar.button("生成"):
-            st.markdown("## ワードクラウド")
-            with st.spinner("Generating..."):
-                io_string = io.StringIO(uploaded_file.getvalue().decode("shift-jis"))
-                text = io_string.read()
-                #tagger = MeCab.Tagger()
-                tagger = MeCab.Tagger(ipadic.MECAB_ARGS)
-                node = tagger.parseToNode(text)
-                words = []
-                while node:
-                    if node.surface.strip() != "":
-                        word_type = node.feature.split(",")[0]
-                        if word_type in selected_pos: # 対象外の品詞はスキップ
-                            words.append(node.surface)
-                    node = node.next
-                word_count = Counter(words)
-                wc = WordCloud(
-                    width=800,
-                    height=800,
-                    background_color="white",
-                    font_path="./ipaexg00401/ipaexg.ttf", # Fontを指定
-                )
-                # ワードクラウドを作成
-                wc.generate_from_frequencies(word_count)
-                # ワードクラウドを表示
-                st.image(wc.to_array())
-    
-    # 出現頻度表の表示
-    elif option == "出現頻度表":
-        pos_options = ["名詞", "形容詞", "動詞", "副詞", "助詞", "助動詞", "接続詞", "感動詞", "連体詞", "記号", "未知語"]
-        # マルチセレクトボックス
-        selected_pos = st.sidebar.multiselect("品詞選択", pos_options, default=pos_options)
-        if st.sidebar.button("生成"):
-            st.markdown("## 出現頻度表")
-            with st.spinner("Generating..."):
-                io_string = io.StringIO(uploaded_file.getvalue().decode("shift-jis"))
-                text = io_string.read()
-                #tagger = MeCab.Tagger()
-                tagger = MeCab.Tagger(ipadic.MECAB_ARGS)
-                node = tagger.parseToNode(text)
+# ページ選択
+page = st.sidebar.selectbox("ページを選択", ["メインメニュー", "編集画面", "比較・閲覧画面"])
 
-                # 品詞ごとに出現単語と出現回数をカウント
-                pos_word_count_dict = {}
-                while node:
-                    pos = node.feature.split(",")[0]
-                    if pos in selected_pos:
-                        if pos not in pos_word_count_dict:
-                            pos_word_count_dict[pos] = {}
-                        if node.surface.strip() != "":
-                            word = node.surface
-                            if word not in pos_word_count_dict[pos]:
-                                pos_word_count_dict[pos][word] = 1
-                            else:
-                                pos_word_count_dict[pos][word] += 1
-                    node = node.next
+if page == "メインメニュー":
+    st.write("成績データと授業スタイルデータを管理します。")
 
-                # カウント結果を表にまとめる
-                pos_dfs = []
-                for pos in selected_pos:
-                    if pos in pos_word_count_dict:
-                        df = pd.DataFrame.from_dict(pos_word_count_dict[pos], orient="index", columns=["出現回数"])
-                        df.index.name = "出現単語"
-                        df = df.sort_values("出現回数", ascending=False)
-                        pos_dfs.append((pos, df))
+    st.write("サイドバーからページを選択してください。")
 
-                # 表を表示
-                for pos, df in pos_dfs:
-                    st.write(f"【{pos}】")
-                    st.dataframe(df, 400, 400)
-else:
-    # テキスト未アップロード時の処理
-    st.write("テキストファイルをアップロードしてください。")
+elif page == "編集画面":
+    st.header("編集画面")
+    st.subheader("成績データの編集")
+
+    with st.form("grade_form"):
+        subject = st.text_input("科目")
+        grade = st.number_input("成績", min_value=0, max_value=100)
+        submitted = st.form_submit_button("追加")
+        if submitted:
+            new_row = pd.DataFrame({'科目': [subject], '成績': [grade]})
+            st.session_state.grade_data = pd.concat([st.session_state.grade_data, new_row], ignore_index=True)
+            st.success("成績データを追加しました。")
+
+    st.subheader("授業スタイルデータの編集")
+    with st.form("style_form"):
+        subject_style = st.text_input("科目 (スタイル)")
+        style = st.text_area("授業スタイル")
+        submitted_style = st.form_submit_button("追加")
+        if submitted_style:
+            new_row_style = pd.DataFrame({'科目': [subject_style], '授業スタイル': [style]})
+            st.session_state.teaching_style = pd.concat([st.session_state.teaching_style, new_row_style], ignore_index=True)
+            st.success("授業スタイルデータを追加しました。")
+
+elif page == "比較・閲覧画面":
+    st.header("比較・閲覧画面")
+    st.subheader("成績データ")
+    st.dataframe(st.session_state.grade_data)
+
+    st.subheader("授業スタイルデータ")
+    st.dataframe(st.session_state.teaching_style)
+
+    # 比較機能（例: 成績の平均）
+    if not st.session_state.grade_data.empty:
+        avg_grade = st.session_state.grade_data['成績'].mean()
+        st.write(f"成績の平均: {avg_grade:.2f}")

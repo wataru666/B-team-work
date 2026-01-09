@@ -13,11 +13,13 @@ st.title("授業効率化システム")
 # ページ選択
 page = st.sidebar.selectbox("ページを選択", ["メインメニュー", "編集画面", "比較・閲覧画面"])
 
+# メインメニュー
 if page == "メインメニュー":
     st.write("成績データと授業スタイルデータを管理します。")
 
     st.write("サイドバーからページを選択してください。")
 
+# 編集画面
 elif page == "編集画面":
     st.header("編集画面")
     st.subheader("成績データの編集")
@@ -41,6 +43,7 @@ elif page == "編集画面":
             st.session_state.teaching_style = pd.concat([st.session_state.teaching_style, new_row_style], ignore_index=True)
             st.success("授業スタイルデータを追加しました。")
 
+# 比較・閲覧画面
 elif page == "比較・閲覧画面":
     st.header("比較・閲覧画面")
     st.subheader("成績データ")

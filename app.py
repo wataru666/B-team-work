@@ -22,8 +22,145 @@ if page == "メインメニュー":
 # 編集画面
 elif page == "編集画面":
     st.header("編集画面")
-    st.subheader("成績データの編集")
+    
+    # タブでセイセキ管理とスタイル管理を分ける
+    tab1, tab2 = st.tabs(["成績管理", "スタイル管理"])
+    
+    with tab1:
+        st.subheader("成績データの確認")
 
+        # 成績管理.xlsxの全シート名を取得
+        try:
+            excel_file = pd.ExcelFile('成績管理.xlsx')
+            sheet_names = excel_file.sheet_names
+            
+            st.success("成績データを読み込みました。")
+        except Exception as e:
+            st.error(f"ファイルの読み込みに失敗しました: {e}")
+            sheet_names = []
+        
+        # 絞り込み機能：シート名（科目）・西暦・期間
+        st.subheader("実施日の絞り込み")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            selected_sheet = st.selectbox("科目", sheet_names, key="grade_subject")
+        with col2:
+            year = st.number_input("西暦", min_value=2000, max_value=2100, value=2024)
+        with col3:
+            period = st.selectbox("期間", ["前期", "後期"], key="grade_period")
+        
+        search_keyword = f"{year}年{period}"
+        
+        # 選択したシートを読み込み
+        if selected_sheet:
+            try:
+                excel_data = pd.read_excel('成績管理.xlsx', sheet_name=selected_sheet)
+                
+                if not excel_data.empty and len(excel_data.columns) > 1:
+                    # B列（2番目の列）から絞り込み
+                    b_column = excel_data.iloc[:, 1]
+                    filtered_indices = b_column[b_column.astype(str).str.contains(search_keyword, na=False)].index
+                    
+                    if len(filtered_indices) > 0:
+                        # 絞り込み結果の行を抽出（B, C, D, E列 - 科目は不要）
+                        filtered_result = excel_data.iloc[filtered_indices, 1:5].copy()
+                        
+                        # カラム名を設定
+                        filtered_result.columns = ['実施日', '学籍番号', '点数', 'かかった時間']
+                        
+                        # 点数に「点」、時間に「分」の単位を追加
+                        filtered_result['点数'] = filtered_result['点数'].astype(str) + '点'
+                        filtered_result['かかった時間'] = filtered_result['かかった時間'].astype(str) + '分'
+                        
+                        st.success(f"'{selected_sheet}' - '{search_keyword}' に該当する実施日:")
+                        st.dataframe(filtered_result)
+                    else:
+                        st.info(f"'{selected_sheet}' - '{search_keyword}' に該当するデータはありません。")
+                
+                st.divider()
+                st.subheader(f"シート '{selected_sheet}' の全データ")
+                st.dataframe(excel_data)
+            except Exception as e:
+                st.error(f"シートの読み込みに失敗しました: {e}")
+    
+    with tab2:
+        st.subheader("スタイルデータの確認・更新")
+        
+        # スタイル管理.xlsxの全シート名を取得
+        try:
+            style_file = pd.ExcelFile('スタイル管理.xlsx')
+            style_sheet_names = style_file.sheet_names
+            
+            st.success("スタイルデータを読み込みました。")
+        except Exception as e:
+            st.error(f"ファイルの読み込みに失敗しました: {e}")
+            style_sheet_names = []
+        
+        # シート選択
+        if style_sheet_names:
+            selected_style_sheet = st.selectbox("科目", style_sheet_names, key="style_subject")
+            
+            try:
+                style_data = pd.read_excel('スタイル管理.xlsx', sheet_name=selected_style_sheet)
+                
+                st.subheader(f"シート '{selected_style_sheet}' のスタイルデータ")
+                
+                # 計算・更新ボタン
+                if st.button("平均点数と平均時間を計算・更新"):
+                    # 成績管理.xlsxから対応するシートを取得
+                    try:
+                        grade_data = pd.read_excel('成績管理.xlsx', sheet_name=selected_style_sheet)
+                        
+                        # B2以降の実施日を取得（インデックス1以降）
+                        if len(style_data) > 1 and len(style_data.columns) >= 4:
+                            for idx in range(1, len(style_data)):
+                                implementation_date = str(style_data.iloc[idx, 1]).strip()  # B列（スタイル管理）
+                                
+                                if pd.isna(style_data.iloc[idx, 1]) or implementation_date == 'nan':
+                                    continue
+                                
+                                # 成績管理から実施日が完全に一致するデータを抽出（B2以降を対象）
+                                matching_rows = []
+                                for grade_idx in range(1, len(grade_data)):
+                                    grade_date_str = str(grade_data.iloc[grade_idx, 1]).strip()
+                                    if grade_date_str == implementation_date:
+                                        matching_rows.append(grade_idx)
+                                
+                                if len(matching_rows) > 0:
+                                    # D列（点数）とE列（かかった時間）の平均を計算
+                                    scores = grade_data.iloc[matching_rows, 3].astype(float).values
+                                    times = grade_data.iloc[matching_rows, 4].astype(float).values
+                                    
+                                    avg_score = scores.mean()
+                                    avg_time = times.mean()
+                                    
+                                    # スタイル管理のC列、D列に入力
+                                    style_data.iloc[idx, 2] = round(avg_score, 2)
+                                    style_data.iloc[idx, 3] = round(avg_time, 2)
+                            
+                            # 更新したデータをスタイル管理.xlsxに保存
+                            with pd.ExcelWriter('スタイル管理.xlsx', engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                                style_data.to_excel(writer, sheet_name=selected_style_sheet, index=False)
+                            
+                            st.success(f"'{selected_style_sheet}' の平均点数と平均時間を計算・更新しました。")
+                        else:
+                            st.error("スタイル管理のデータ形式が正しくありません。")
+                    except Exception as e:
+                        st.error(f"計算・更新に失敗しました: {e}")
+                
+                st.subheader(f"シート '{selected_style_sheet}' のスタイルデータ")
+                
+                # 科目列を除いた表示用データ（B, C, D列のみ）
+                display_data = style_data.iloc[:, 1:4].copy()
+                display_data.columns = ['実施日', '平均点数', '平均時間']
+                st.dataframe(display_data)
+            except Exception as e:
+                st.error(f"シートの読み込みに失敗しました: {e}")
+    
+    # 従来の手動入力フォーム（オプション）
+    st.divider()
+    st.subheader("手動入力（オプション）")
     with st.form("grade_form"):
         subject = st.text_input("科目")
         grade = st.number_input("成績", min_value=0, max_value=100)

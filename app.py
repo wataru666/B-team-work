@@ -99,12 +99,49 @@ elif page == "編集画面":
         
         # シート選択
         if style_sheet_names:
-            selected_style_sheet = st.selectbox("科目", style_sheet_names, key="style_subject")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                selected_style_sheet = st.selectbox("科目", style_sheet_names, key="style_subject")
+            
+            # スタイル名を取得（E2、F2以降の2行目の列から）
+            style_names = []
+            try:
+                style_file_data = pd.read_excel('スタイル管理.xlsx', sheet_name=selected_style_sheet, header=None)
+                
+                # デバッグ情報
+                st.write(f"シートの行数: {len(style_file_data)}, 列数: {len(style_file_data.columns)}")
+                if len(style_file_data) > 1:
+                    st.write(f"2行目のデータ: {style_file_data.iloc[1, :].to_dict()}")
+                
+                # E列（インデックス4）、F列（インデックス5）以降の2行目（インデックス1）から取得
+                if len(style_file_data) > 1 and len(style_file_data.columns) > 4:
+                    for col_idx in range(4, len(style_file_data.columns)):
+                        style_name = style_file_data.iloc[1, col_idx]
+                        if pd.notna(style_name) and str(style_name).strip() != '':
+                            style_names.append(str(style_name).strip())
+                
+                # 重複を除去
+                style_names = list(dict.fromkeys(style_names))
+                st.write(f"抽出されたスタイル名: {style_names}")
+            except Exception as e:
+                st.warning(f"スタイル名の取得に失敗しました: {e}")
+            
+            with col2:
+                if style_names:
+                    selected_style_name = st.selectbox("スタイル名", [""] + style_names, key="style_name")
+                else:
+                    st.info("スタイル名が見つかりません。スタイル管理ファイルを確認してください。")
+                    selected_style_name = ""
             
             try:
                 style_data = pd.read_excel('スタイル管理.xlsx', sheet_name=selected_style_sheet)
                 
-                st.subheader(f"シート '{selected_style_sheet}' のスタイルデータ")
+                # スタイル名が選択されている場合のみ処理
+                if selected_style_name:
+                    st.subheader(f"スタイル '{selected_style_name}' のデータ")
+                else:
+                    st.subheader(f"シート '{selected_style_sheet}' のスタイルデータ")
                 
                 # 計算・更新ボタン
                 if st.button("平均点数と平均時間を計算・更新"):

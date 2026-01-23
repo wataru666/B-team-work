@@ -105,27 +105,31 @@ elif page == "編集画面":
                 selected_style_sheet = st.selectbox("科目", style_sheet_names, key="style_subject")
             
             # スタイル名を取得（E2、F2以降の2行目の列から）
+           # --- 全シートからスタイル名を抽出する ---
             style_names = []
+
             try:
-                style_file_data = pd.read_excel('スタイル管理.xlsx', sheet_name=selected_style_sheet, header=None)
-                
-                # デバッグ情報
-                st.write(f"シートの行数: {len(style_file_data)}, 列数: {len(style_file_data.columns)}")
-                if len(style_file_data) > 1:
-                    st.write(f"2行目のデータ: {style_file_data.iloc[1, :].to_dict()}")
-                
-                # E列（インデックス4）、F列（インデックス5）以降の2行目（インデックス1）から取得
-                if len(style_file_data) > 1 and len(style_file_data.columns) > 4:
-                    for col_idx in range(4, len(style_file_data.columns)):
-                        style_name = style_file_data.iloc[1, col_idx]
-                        if pd.notna(style_name) and str(style_name).strip() != '':
-                            style_names.append(str(style_name).strip())
-                
-                # 重複を除去
+                style_file = pd.ExcelFile('スタイル管理.xlsx')
+                style_sheet_names = style_file.sheet_names
+
+                for sheet in style_sheet_names:
+                    df = pd.read_excel('スタイル管理.xlsx', sheet_name=sheet, header=None)
+
+                    # 2行目（index=1）が存在するか確認
+                    if len(df) > 1 and len(df.columns) > 4:
+                        # E列(4)〜右端まで
+                        for col_idx in range(4, len(df.columns)):
+                            value = df.iloc[1, col_idx]
+                            if pd.notna(value) and str(value).strip() != "":
+                                style_names.append(str(value).strip())
+
+                # 重複削除
                 style_names = list(dict.fromkeys(style_names))
-                st.write(f"抽出されたスタイル名: {style_names}")
+
+                st.write(f"全シートから抽出されたスタイル名: {style_names}")
+
             except Exception as e:
-                st.warning(f"スタイル名の取得に失敗しました: {e}")
+                st.error(f"スタイル名の取得に失敗しました: {e}")
             
             with col2:
                 if style_names:

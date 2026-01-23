@@ -234,3 +234,79 @@ elif page == "比較・閲覧画面":
     if not st.session_state.grade_data.empty:
         avg_grade = st.session_state.grade_data['成績'].mean()
         st.write(f"成績の平均: {avg_grade:.2f}")
+
+    # --- 追加: 成績管理.xlsxから年度・期間を抽出して比較グラフを表示 ---
+    try:
+        excel_file = pd.ExcelFile('成績管理.xlsx')
+        sheet_names = excel_file.sheet_names
+
+        # B列に含まれる「YYYY年(前期|後期)」を抽出
+        import re
+
+        period_set = set()
+        for sheet in sheet_names:
+            try:
+                df = pd.read_excel('成績管理.xlsx', sheet_name=sheet, dtype=str)
+                if df.shape[1] > 1:
+                    bcol = df.iloc[:, 1].astype(str).fillna('')
+                    for s in bcol:
+                        m = re.search(r"(\d{4})年(前期|後期)", s)
+                        if m:
+                            period_set.add(f"{m.group(1)}年{m.group(2)}")
+            except Exception:
+                continue
+
+        period_options = sorted(list(period_set))
+
+        st.subheader("年度・期間で比較 (複数選択可)")
+        selected_periods = st.multiselect("年度・期間を選択", period_options, key="compare_periods")
+
+        if selected_periods:
+            results = []
+            for token in selected_periods:
+                scores_acc = []
+                times_acc = []
+                for sheet in sheet_names:
+                    try:
+                        df = pd.read_excel('成績管理.xlsx', sheet_name=sheet, dtype=str)
+                        if df.shape[1] > 4:
+                            bcol = df.iloc[:, 1].astype(str).fillna('')
+                            mask = bcol.str.contains(token, na=False)
+                            if mask.any():
+                                # D列(インデックス3)=点数, E列(インデックス4)=かかった時間
+                                score_vals = pd.to_numeric(df.loc[mask, df.columns[3]], errors='coerce')
+                                time_vals = pd.to_numeric(df.loc[mask, df.columns[4]], errors='coerce')
+                                scores_acc.extend(score_vals.dropna().tolist())
+                                times_acc.extend(time_vals.dropna().tolist())
+                    except Exception:
+                        continue
+
+                avg_score = float('nan') if len(scores_acc) == 0 else sum(scores_acc) / len(scores_acc)
+                avg_time = float('nan') if len(times_acc) == 0 else sum(times_acc) / len(times_acc)
+                results.append({'period': token, 'avg_score': avg_score, 'avg_time': avg_time})
+
+            if results:
+                df_res = pd.DataFrame(results)
+
+                # 年度順にソート
+                def _sort_key(x):
+                    m = re.match(r"(\d{4})年(前期|後期)", x)
+                    if not m:
+                        return (0, 0)
+                    year = int(m.group(1))
+                    term = 1 if m.group(2) == '前期' else 2
+                    return (year, term)
+
+                df_res['sort_key'] = df_res['period'].map(_sort_key)
+                df_res = df_res.sort_values('sort_key').set_index('period')
+                df_res = df_res[['avg_score', 'avg_time']]
+
+                st.subheader("平均点数と平均時間の推移")
+                st.line_chart(df_res)
+            else:
+                st.info("選択した期間に該当するデータが見つかりませんでした。")
+    except FileNotFoundError:
+        st.info("成績管理.xlsx が見つかりません。編集画面から読み込んでください。")
+    except Exception as e:
+        st.error(f"比較データの作成に失敗しました: {e}")
+

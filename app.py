@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-
+# burantiテスト
 # セッションステートでデータを管理
 if 'grade_data' not in st.session_state:
     st.session_state.grade_data = pd.DataFrame(columns=['科目', '成績'])
